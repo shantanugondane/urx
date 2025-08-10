@@ -1,12 +1,23 @@
 'use client'
 
-import { useState } from 'react'
-
-export default function VariantRow({ variant, options, isChild = false }) {
-  const [price, setPrice] = useState(variant.price || '')
-  const [available, setAvailable] = useState(variant.available || 0)
-
+export default function VariantRow({ 
+  variant, 
+  options, 
+  isChild = false,
+  variantPrices,
+  variantAvailability,
+  onPriceChange,
+  onAvailabilityChange
+}) {
   const indentClass = isChild ? 'pl-8' : ''
+
+  const handlePriceChange = (e) => {
+    onPriceChange(variant.id, e.target.value)
+  }
+
+  const handleAvailabilityChange = (e) => {
+    onAvailabilityChange(variant.id, parseInt(e.target.value) || 0)
+  }
 
   return (
     <div className={`px-4 py-3 hover:bg-gray-50 transition-colors ${indentClass}`}>
@@ -19,8 +30,8 @@ export default function VariantRow({ variant, options, isChild = false }) {
             <span className="text-gray-500 mr-1">₹</span>
             <input
               type="text"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              value={variantPrices[variant.id] || ''}
+              onChange={handlePriceChange}
               className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="0.00"
             />
@@ -29,8 +40,8 @@ export default function VariantRow({ variant, options, isChild = false }) {
         <div className="col-span-3">
           <input
             type="number"
-            value={available}
-            onChange={(e) => setAvailable(parseInt(e.target.value) || 0)}
+            value={variantAvailability[variant.id] || 0}
+            onChange={handleAvailabilityChange}
             className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             min="0"
           />

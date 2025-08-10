@@ -10,13 +10,32 @@ export default function VariantGroupRow({
   options, 
   groupBy, 
   isExpanded, 
-  onToggle 
+  onToggle,
+  variantPrices,
+  variantAvailability,
+  onPriceChange,
+  onAvailabilityChange,
+  getPriceRange
 }) {
-  const [price, setPrice] = useState('')
-  const [available, setAvailable] = useState(0)
-
   const groupOptionIndex = options.findIndex(opt => opt.name === groupBy)
   const otherOptions = options.filter((_, index) => index !== groupOptionIndex)
+
+  // Get the main variant for this group
+  const mainVariant = variants[0]
+  const mainVariantId = mainVariant?.id
+
+  // Get price range for display
+  const priceRange = getPriceRange(variants)
+
+  // Handle main variant price change (this will sync to all sub-variants)
+  const handleMainPriceChange = (newPrice) => {
+    onPriceChange(mainVariantId, newPrice, true)
+  }
+
+  // Handle main variant availability change
+  const handleMainAvailabilityChange = (newAvailability) => {
+    onAvailabilityChange(mainVariantId, newAvailability)
+  }
 
   const renderColorSwatch = (value) => {
     if (groupBy.toLowerCase() === 'color') {
@@ -75,18 +94,23 @@ export default function VariantGroupRow({
               <span className="text-gray-500 mr-1">₹</span>
               <input
                 type="text"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                value={variantPrices[mainVariantId] || ''}
+                onChange={(e) => handleMainPriceChange(e.target.value)}
                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="0.00"
               />
             </div>
+            {priceRange && (
+              <div className="text-xs text-gray-500 mt-1">
+                {priceRange}
+              </div>
+            )}
           </div>
           <div className="col-span-3">
             <input
               type="number"
-              value={available}
-              onChange={(e) => setAvailable(parseInt(e.target.value) || 0)}
+              value={variantAvailability[mainVariantId] || 0}
+              onChange={(e) => handleMainAvailabilityChange(parseInt(e.target.value) || 0)}
               className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-gray-100 text-gray-500 focus:outline-none"
               disabled
             />
@@ -102,6 +126,10 @@ export default function VariantGroupRow({
               variant={variant}
               options={options}
               isChild={true}
+              variantPrices={variantPrices}
+              variantAvailability={variantAvailability}
+              onPriceChange={onPriceChange}
+              onAvailabilityChange={onAvailabilityChange}
             />
           ))}
         </div>

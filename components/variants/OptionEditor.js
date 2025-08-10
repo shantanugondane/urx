@@ -8,6 +8,7 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
   const [name, setName] = useState(option?.name || '')
   const [values, setValues] = useState(option?.values || [''])
   const [errors, setErrors] = useState({})
+  const [draggedIndex, setDraggedIndex] = useState(null)
 
   useEffect(() => {
     setName(option?.name || '')
@@ -65,6 +66,42 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
     }
   }
 
+  // Drag and drop handlers
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/html', e.target.outerHTML)
+  }
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault()
+    
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      return
+    }
+
+    const newValues = [...values]
+    const draggedValue = newValues[draggedIndex]
+    
+    // Remove the dragged item
+    newValues.splice(draggedIndex, 1)
+    
+    // Insert at the new position
+    newValues.splice(dropIndex, 0, draggedValue)
+    
+    setValues(newValues)
+    setDraggedIndex(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null)
+  }
+
   return (
     <form onSubmit={handleSave} className="border border-gray-200 rounded-lg p-4 mb-4">
       <div className="flex items-center justify-between mb-4">
@@ -116,8 +153,18 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
           </label>
           <div className="space-y-2">
             {values.map((value, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <div className="text-gray-400 cursor-grab">
+              <div 
+                key={index} 
+                className={`flex items-center gap-2 p-2 rounded-md transition-colors ${
+                  draggedIndex === index ? 'bg-blue-50 border border-blue-200' : ''
+                }`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="text-gray-400 cursor-grab active:cursor-grabbing">
                   <GripVertical className="w-4 h-4" />
                 </div>
                 <input

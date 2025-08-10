@@ -16,7 +16,12 @@ export default function VariantTable({
   expandedGroups, 
   onToggleGroup, 
   onExpandAll, 
-  onCollapseAll 
+  onCollapseAll,
+  variantPrices,
+  variantAvailability,
+  onPriceChange,
+  onAvailabilityChange,
+  getPriceRange
 }) {
   const [showSearch, setShowSearch] = useState(false)
 
@@ -34,7 +39,7 @@ export default function VariantTable({
       return groups
     }, {})
 
-  const totalInventory = variants.reduce((sum, variant) => sum + (variant.available || 0), 0)
+  const totalInventory = Object.values(variantAvailability).reduce((sum, available) => sum + (available || 0), 0)
 
   return (
     <div className="mt-6">
@@ -114,6 +119,10 @@ export default function VariantTable({
                 key={variant.id}
                 variant={variant}
                 options={options}
+                variantPrices={variantPrices}
+                variantAvailability={variantAvailability}
+                onPriceChange={onPriceChange}
+                onAvailabilityChange={onAvailabilityChange}
               />
             ))
           ) : (
@@ -126,6 +135,11 @@ export default function VariantTable({
                 groupBy={groupBy}
                 isExpanded={expandedGroups[groupValue]}
                 onToggle={() => onToggleGroup(groupValue)}
+                variantPrices={variantPrices}
+                variantAvailability={variantAvailability}
+                onPriceChange={onPriceChange}
+                onAvailabilityChange={onAvailabilityChange}
+                getPriceRange={getPriceRange}
               />
             ))
           )}
