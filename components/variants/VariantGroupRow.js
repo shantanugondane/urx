@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronDown, ChevronRight, Image } from 'lucide-react'
 import VariantRow from './VariantRow'
 
 export default function VariantGroupRow({ 
@@ -15,7 +15,9 @@ export default function VariantGroupRow({
   variantAvailability,
   onPriceChange,
   onAvailabilityChange,
-  getPriceRange
+  getPriceRange,
+  isSelected,
+  isLast
 }) {
   const groupOptionIndex = options.findIndex(opt => opt.name === groupBy)
   const otherOptions = options.filter((_, index) => index !== groupOptionIndex)
@@ -29,7 +31,73 @@ export default function VariantGroupRow({
 
   // Handle main variant price change (this will sync to all sub-variants)
   const handleMainPriceChange = (newPrice) => {
+    // Validate the new price
+    const parsedPrice = parseFloat(newPrice)
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
+      return // Don't update if invalid price
+    }
+    
+    // Update the main variant price - this will automatically sync to all sub-variants
+    // because we pass isMainVariant=true and the parent component handles the syncing
     onPriceChange(mainVariantId, newPrice, true)
+  }
+
+  // Check if all child variants have the same price
+  const allChildrenSamePrice = () => {
+    const childPrices = variants
+      .filter(v => v.id !== mainVariantId)
+      .map(v => variantPrices[v.id])
+      .filter(p => p && p !== '')
+    
+    if (childPrices.length === 0) return true
+    if (childPrices.length === 1) return true
+    
+    const firstPrice = childPrices[0]
+    return childPrices.every(price => price === firstPrice)
+  }
+
+  // Get the current price range or single price for display
+  const getCurrentPriceDisplay = () => {
+    const prices = variants
+      .map(v => variantPrices[v.id])
+      .filter(p => p && p !== '')
+      .map(p => parseFloat(p))
+      .filter(p => !isNaN(p))
+    
+    if (prices.length === 0) return ''
+    if (prices.length === 1) return prices[0].toFixed(2)
+    
+    const min = Math.min(...prices)
+    const max = Math.max(...prices)
+    return min === max ? min.toFixed(2) : `${min.toFixed(2)} - ${max.toFixed(2)}`
+  }
+
+  // Determine if parent should show as editable input or read-only range
+  const shouldShowEditableParent = () => {
+    // Show as editable when:
+    // 1. All children have the same price, OR
+    // 2. No prices are set yet (initial state)
+    const childrenSamePrice = allChildrenSamePrice()
+    const hasMainPrice = variantPrices[mainVariantId] && variantPrices[mainVariantId] !== ''
+    const noPricesSet = variants.every(v => !variantPrices[v.id] || variantPrices[v.id] === '')
+    
+    return (childrenSamePrice && hasMainPrice) || noPricesSet
+  }
+
+  // Handle clicking on the price range to make it editable
+  const handlePriceRangeClick = () => {
+    // Get the current minimum price from children and set it as the parent price
+    const childPrices = variants
+      .filter(v => v.id !== mainVariantId)
+      .map(v => variantPrices[v.id])
+      .filter(p => p && p !== '')
+      .map(p => parseFloat(p))
+      .filter(p => !isNaN(p))
+    
+    if (childPrices.length > 0) {
+      const minPrice = Math.min(...childPrices)
+      handleMainPriceChange(minPrice.toString())
+    }
   }
 
   // Handle main variant availability change
@@ -37,87 +105,99 @@ export default function VariantGroupRow({
     onAvailabilityChange(mainVariantId, newAvailability)
   }
 
-  const renderColorSwatch = (value) => {
+  const getVariantTitle = (variant) => {
     if (groupBy.toLowerCase() === 'color') {
-      const colorMap = {
-        'black': '#000000',
-        'white': '#ffffff',
-        'red': '#ff0000',
-        'blue': '#0000ff',
-        'green': '#00ff00',
-        'yellow': '#ffff00',
-        'purple': '#800080',
-        'orange': '#ffa500',
-        'pink': '#ffc0cb',
-        'brown': '#a52a2a',
-        'gray': '#808080',
-        'grey': '#808080'
-      }
-      
-      const color = colorMap[value.toLowerCase()] || '#e5e7eb'
-      return (
-        <div 
-          className="w-3 h-3 rounded-full border border-gray-300 mr-2"
-          style={{ backgroundColor: color }}
-        />
-      )
+      const sizeValue = variant.values[options.findIndex(opt => opt.name.toLowerCase() === 'size')]
+      return `${variant.values[groupOptionIndex]} / ${sizeValue || 'Medium'}`
+    } else if (groupBy.toLowerCase() === 'size') {
+      const colorValue = variant.values[options.findIndex(opt => opt.name.toLowerCase() === 'color')]
+      return `${colorValue || 'Black'} / ${variant.values[groupOptionIndex]}`
     }
-    return null
+    return variant.title
   }
+
+  // Ensure reactive updates when child prices change
+  useEffect(() => {
+    // This effect ensures the parent display updates when child prices change
+    // The dependency on variantPrices ensures re-renders when prices update
+  }, [variantPrices, variants])
 
   return (
     <>
-      <div className="bg-gray-50 px-4 py-3 hover:bg-gray-100 transition-colors">
-        <div className="grid grid-cols-12 gap-4 items-center">
-          <div className="col-span-6 flex items-center">
+      <div className={`px-4 py-4 border-t border-gray-200 ${isLast ? 'rounded-b-2xl' : ''} hover:bg-gray-200 hover:border-gray-300 transition-all duration-200`}>
+        <div className="grid grid-cols-[40px_60px_1fr_120px_120px] items-center gap-4">
+          {/* Checkbox */}
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              className="h-4 w-4 rounded border-gray-300 text-gray-700"
+            />
+          </div>
+          
+          {/* Thumbnail */}
+          <div className="h-12 w-12 rounded-lg border border-gray-200 bg-white grid place-items-center text-gray-400">
+            <Image className="w-5 h-5" />
+          </div>
+          
+          {/* Variant Name Area */}
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between">
+              <span className="text-base font-medium text-gray-900">{groupValue}</span>
+            </div>
             <button
               onClick={onToggle}
-              className="mr-2 text-gray-400 hover:text-gray-600"
-              aria-label={isExpanded ? 'Collapse group' : 'Expand group'}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800 transition-colors mt-1"
             >
+              <span>{variants.length} variant{variants.length !== 1 ? 's' : ''}</span>
               {isExpanded ? (
                 <ChevronDown className="w-4 h-4" />
               ) : (
                 <ChevronRight className="w-4 h-4" />
               )}
             </button>
-            <div className="flex items-center">
-              {renderColorSwatch(groupValue)}
-              <span className="font-medium text-gray-900">{groupValue}</span>
-            </div>
-            <span className="ml-2 text-sm text-gray-500">
-              {variants.length} variant{variants.length !== 1 ? 's' : ''}
-            </span>
           </div>
-          <div className="col-span-3">
-            <div className="flex items-center">
-              <span className="text-gray-500 mr-1">₹</span>
-              <input
-                type="text"
-                value={variantPrices[mainVariantId] || ''}
-                onChange={(e) => handleMainPriceChange(e.target.value)}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="0.00"
-              />
-            </div>
-            {priceRange && (
-              <div className="text-xs text-gray-500 mt-1">
-                {priceRange}
+          
+          {/* Price Input */}
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <div className="flex-shrink-0 w-8 h-10 rounded-lg border border-gray-300 bg-gray-50 flex items-center justify-center text-gray-600 text-sm font-medium">
+                ₹
               </div>
-            )}
+              {shouldShowEditableParent() ? (
+                <input
+                  type="text"
+                  value={variantPrices[mainVariantId] || ''}
+                  onChange={(e) => handleMainPriceChange(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-gray-300 px-3 text-gray-800 placeholder:text-gray-400 focus:border-gray-400 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 focus:outline-none transition-colors"
+                  placeholder="0.00"
+                />
+              ) : (
+                <div 
+                  className="h-10 w-full rounded-lg border border-gray-300 px-3 text-gray-800 bg-white flex items-center cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={handlePriceRangeClick}
+                >
+                  {getCurrentPriceDisplay() || '0.00'}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="col-span-3">
+          
+          {/* Available Input */}
+          <div>
             <input
               type="number"
               value={variantAvailability[mainVariantId] || 0}
               onChange={(e) => handleMainAvailabilityChange(parseInt(e.target.value) || 0)}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-gray-100 text-gray-500 focus:outline-none"
-              disabled
+              className="h-10 w-full rounded-lg border border-gray-300 px-3 text-gray-800 placeholder:text-gray-400 bg-white focus:border-gray-400 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 focus:outline-none transition-colors"
+              min="0"
+              placeholder="0"
             />
           </div>
         </div>
       </div>
 
+      {/* Child Variants */}
       {isExpanded && (
         <div className="bg-white">
           {variants.map(variant => (
@@ -130,6 +210,8 @@ export default function VariantGroupRow({
               variantAvailability={variantAvailability}
               onPriceChange={onPriceChange}
               onAvailabilityChange={onAvailabilityChange}
+              isSelected={isSelected}
+              getVariantTitle={getVariantTitle}
             />
           ))}
         </div>

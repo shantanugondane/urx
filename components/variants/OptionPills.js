@@ -1,27 +1,48 @@
 'use client'
 
-import { Edit3 } from 'lucide-react'
+import { Edit3, GripVertical } from 'lucide-react'
 
-export default function OptionPills({ option, onEdit, onDelete }) {
+export default function OptionPills({ 
+  option, 
+  onEdit, 
+  onDelete, 
+  onToggle,
+  isOpen,
+  isFirst, 
+  index,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop
+}) {
   return (
-    <div className="mb-4">
-      <div 
-        className="inline-flex items-center gap-2 p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
-        onClick={onEdit}
+    <div className={[
+      "grid grid-cols-[20px_1fr] items-start",
+      isFirst ? "bg-gray-50" : "bg-white border-t border-gray-200"
+    ].join(" ")}>
+      <div className="p-4 md:p-5">
+        <GripVertical className="h-4 w-4 text-gray-400 mt-1" />
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="w-full text-left p-4 md:p-5 hover:bg-gray-50/60"
       >
-        <span className="text-sm font-medium text-gray-900">{option.name}</span>
-        <div className="flex items-center gap-1">
-          {option.values.map((value, index) => (
+        <div className="text-base font-semibold text-gray-900 mb-2">{option.name}</div>
+        <div className="flex flex-wrap gap-2">
+          {option.values.map((value, valueIndex) => (
             <span
-              key={index}
-              className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
+              key={valueIndex}
+              className="inline-flex items-center rounded-md bg-gray-200/70 px-3 py-1 text-sm text-gray-800"
             >
               {value}
             </span>
           ))}
         </div>
-        <Edit3 className="w-4 h-4 text-gray-400" />
-      </div>
+      </button>
     </div>
   )
 }

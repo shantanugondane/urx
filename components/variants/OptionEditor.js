@@ -1,19 +1,27 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { GripVertical, Trash2, X } from 'lucide-react'
 import { isOptionNameUnique, areOptionValuesUnique } from '../../lib/variants'
 
-export default function OptionEditor({ option, onSave, onCancel, onDelete, existingOptions }) {
+export default function OptionEditor({ option, onSave, onCancel, onDelete, existingOptions, variant = "bare" }) {
   const [name, setName] = useState(option?.name || '')
   const [values, setValues] = useState(option?.values || [''])
   const [errors, setErrors] = useState({})
   const [draggedIndex, setDraggedIndex] = useState(null)
+  const nameInputRef = useRef(null)
 
   useEffect(() => {
     setName(option?.name || '')
     setValues(option?.values || [''])
   }, [option])
+
+  // Focus the name input when the editor opens
+  useEffect(() => {
+    if (nameInputRef.current) {
+      nameInputRef.current.focus()
+    }
+  }, [])
 
   const validateForm = () => {
     const newErrors = {}
@@ -50,6 +58,12 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
 
   const addValue = () => {
     setValues(prev => [...prev, ''])
+  }
+
+  const addSpecificValue = (value) => {
+    if (value.trim()) {
+      setValues(prev => [...prev, value.trim()])
+    }
   }
 
   const updateValue = (index, value) => {
@@ -102,44 +116,23 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
     setDraggedIndex(null)
   }
 
-  return (
-    <form onSubmit={handleSave} className="border border-gray-200 rounded-lg p-4 mb-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-900">
-          {option?.id ? 'Edit Option' : 'Add Option'}
-        </h3>
-        <div className="flex items-center gap-2">
-          {option?.id && (
-            <button
-              onClick={onDelete}
-              type="button"
-              className="text-red-600 hover:text-red-700 text-sm"
-            >
-              Delete
-            </button>
-          )}
-          <button
-            onClick={onCancel}
-            type="button"
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+  const Container = ({ children }) => variant === "bare"
+    ? <>{children}</>
+    : <div className="rounded-xl border border-gray-200 bg-white p-5">{children}</div>
 
-      <div className="space-y-4">
+  return (
+    <Container>
+      <form onSubmit={handleSave} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Option name
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Option name</label>
           <input
+            ref={nameInputRef}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className={`w-full px-3 py-2 border rounded-md text-sm ${
-              errors.name ? 'border-red-300' : 'border-gray-300'
-            } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+            className={`h-11 w-full rounded-lg border border-gray-300 px-3 text-[16px] text-gray-800 placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none transition-colors ${
+              errors.name ? 'border-red-300' : ''
+            }`}
             placeholder="e.g., Size, Color, Material"
           />
           {errors.name && (
@@ -148,14 +141,12 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Option values
-          </label>
+          <div className="mb-1 text-sm font-medium text-gray-700">Option values</div>
           <div className="space-y-2">
             {values.map((value, index) => (
               <div 
                 key={index} 
-                className={`flex items-center gap-2 p-2 rounded-md transition-colors ${
+                className={`grid grid-cols-[18px_1fr] items-center gap-2 rounded-md transition-colors ${
                   draggedIndex === index ? 'bg-blue-50 border border-blue-200' : ''
                 }`}
                 draggable
@@ -165,56 +156,74 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
                 onDragEnd={handleDragEnd}
               >
                 <div className="text-gray-400 cursor-grab active:cursor-grabbing">
-                  <GripVertical className="w-4 h-4" />
+                  <GripVertical className="h-4 w-4" />
                 </div>
-                <input
-                  type="text"
-                  value={value}
-                  onChange={(e) => updateValue(index, e.target.value)}
-                  onKeyPress={(e) => handleKeyPress(e, index)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder={`Value ${index + 1}`}
-                />
-                {values.length > 1 && (
-                  <button
-                    onClick={() => removeValue(index)}
-                    type="button"
-                    className="text-gray-400 hover:text-red-600"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => updateValue(index, e.target.value)}
+                    onKeyPress={(e) => handleKeyPress(e, index)}
+                    className="h-11 w-full rounded-lg border border-gray-300 px-3 pr-10 text-[16px] text-gray-800 placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none transition-colors"
+                    placeholder={`Value ${index + 1}`}
+                  />
+                  {values.length > 1 && (
+                    <button
+                      onClick={() => removeValue(index)}
+                      type="button"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-md p-1 hover:bg-gray-100 text-gray-500"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
-            <button
-              onClick={addValue}
-              type="button"
-              className="text-sm text-blue-600 hover:text-blue-700"
-            >
-              + Add another value
-            </button>
+            <div className="grid grid-cols-[18px_1fr] items-center gap-2 opacity-75">
+              <div className="text-gray-300">
+                <GripVertical className="h-4 w-4" />
+              </div>
+              <input
+                type="text"
+                placeholder="Add option"
+                className="h-11 w-full rounded-lg border border-gray-300 px-3 text-[16px] text-gray-800 placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none transition-colors focus:opacity-100"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && e.target.value.trim()) {
+                    addSpecificValue(e.target.value)
+                    e.target.value = ''
+                  }
+                }}
+                onBlur={(e) => {
+                  if (e.target.value.trim()) {
+                    addSpecificValue(e.target.value)
+                    e.target.value = ''
+                  }
+                }}
+              />
+              <span></span>
+            </div>
           </div>
           {errors.values && (
             <p className="text-red-600 text-xs mt-1">{errors.values}</p>
           )}
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex justify-between items-center mt-5">
+          <button
+            onClick={onDelete}
+            type="button"
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-[15px] text-red-600 hover:bg-gray-50 transition-colors"
+          >
+            Delete
+          </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="rounded-lg bg-gray-800 px-4 py-2 text-[15px] font-medium text-white shadow-sm hover:bg-gray-900 transition-colors"
           >
             Done
           </button>
-          <button
-            onClick={onCancel}
-            type="button"
-            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 text-sm font-medium rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Cancel
-          </button>
         </div>
-      </div>
-    </form>
+      </form>
+    </Container>
   )
 }
