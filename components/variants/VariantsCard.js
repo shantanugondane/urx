@@ -291,6 +291,7 @@ export default function VariantsCard() {
             <AnimatePresence initial={false}>
               {editingId === option.id && (
                 <motion.div
+                  key={`editor-${option.id}`}
                   ref={el => editorRefs.current[option.id] = el}
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}

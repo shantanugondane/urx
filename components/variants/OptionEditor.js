@@ -1,45 +1,76 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { GripVertical, Trash2, X } from 'lucide-react'
 import { isOptionNameUnique, areOptionValuesUnique } from '../../lib/variants'
 
-export default function OptionEditor({ option, onSave, onCancel, onDelete, existingOptions, variant = "bare" }) {
-  const [name, setName] = useState(option?.name || '')
-  const [values, setValues] = useState(option?.values || [''])
+// Fallback for crypto.randomUUID() if not available
+const generateId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return Date.now().toString(36) + Math.random().toString(36).substr(2)
+}
+
+function OptionEditor({ option, onSave, onCancel, onDelete, existingOptions, variant = "bare" }) {
+  // Initialize state with option data immediately, no useEffect
+  const [name, setName] = useState(() => option?.name || '')
+  const [rows, setRows] = useState(() => {
+    const optionValues = option?.values || []
+    const toRows = optionValues.map(v => ({
+      id: generateId(),
+      text: String(v ?? "")
+    }))
+    return toRows.length ? toRows : [{ id: generateId(), text: "" }]
+  })
   const [errors, setErrors] = useState({})
   const [draggedIndex, setDraggedIndex] = useState(null)
   const nameInputRef = useRef(null)
+  const initialOptionId = useRef(option?.id)
 
-  useEffect(() => {
-    setName(option?.name || '')
-    setValues(option?.values || [''])
-  }, [option])
-
-  // Focus the name input when the editor opens
+  // Focus the name input when component first mounts
   useEffect(() => {
     if (nameInputRef.current) {
       nameInputRef.current.focus()
     }
-  }, [])
+  }, []) // Empty dependency array - only run once
 
   const validateForm = () => {
     const newErrors = {}
     
     if (!name.trim()) {
       newErrors.name = 'Option name is required'
-    } else if (!isOptionNameUnique(name.trim(), existingOptions, option?.id)) {
+    } else if (!isOptionNameUnique(name.trim(), existingOptions, initialOptionId.current)) {
       newErrors.name = 'Option name must be unique'
     }
     
-    if (values.length === 0 || values.every(v => !v.trim())) {
+    if (rows.length === 0 || rows.every(r => !r.text.trim())) {
       newErrors.values = 'At least one value is required'
-    } else if (!areOptionValuesUnique(values)) {
+    } else if (!areOptionValuesUnique(rows.map(r => r.text))) {
       newErrors.values = 'Values must be unique'
     }
     
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
+  }
+
+  // Only validate name uniqueness on blur, not on every keystroke
+  const handleNameBlur = () => {
+    if (name.trim() && !isOptionNameUnique(name.trim(), existingOptions, initialOptionId.current)) {
+      setErrors(prev => ({ ...prev, name: 'Option name must be unique' }))
+    } else {
+      setErrors(prev => ({ ...prev, name: undefined }))
+    }
+  }
+
+  // Only validate values uniqueness on blur, not on every keystroke
+  const handleValueBlur = () => {
+    const values = rows.map(r => r.text.trim()).filter(Boolean)
+    if (values.length > 0 && !areOptionValuesUnique(values)) {
+      setErrors(prev => ({ ...prev, values: 'Values must be unique' }))
+    } else {
+      setErrors(prev => ({ ...prev, values: undefined }))
+    }
   }
 
   const handleSave = (e) => {
@@ -48,34 +79,37 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
     }
     
     if (validateForm()) {
+      const values = rows
+        .map(r => r.text.trim())
+        .filter(Boolean)
       onSave({
-        id: option?.id,
+        id: initialOptionId.current,
         name: name.trim(),
-        values: values.map(v => v.trim()).filter(v => v)
+        values
       })
     }
   }
 
-  const addValue = () => {
-    setValues(prev => [...prev, ''])
-  }
+  const addValue = useCallback(() => {
+    setRows(prev => [...prev, { id: generateId(), text: '' }])
+  }, [])
 
-  const addSpecificValue = (value) => {
+  const addSpecificValue = useCallback((value) => {
     if (value.trim()) {
-      setValues(prev => [...prev, value.trim()])
+      setRows(prev => [...prev, { id: generateId(), text: value.trim() }])
     }
-  }
+  }, [])
 
-  const updateValue = (index, value) => {
-    setValues(prev => prev.map((v, i) => i === index ? value : v))
-  }
+  const updateValue = useCallback((rowId, value) => {
+    setRows(prev => prev.map(r => r.id === rowId ? { ...r, text: value } : r))
+  }, [])
 
-  const removeValue = (index) => {
-    setValues(prev => prev.filter((_, i) => i !== index))
-  }
+  const removeValue = useCallback((rowId) => {
+    setRows(prev => prev.filter(r => r.id !== rowId))
+  }, [])
 
   const handleKeyPress = (e, index) => {
-    if (e.key === 'Enter' && index === values.length - 1) {
+    if (e.key === 'Enter' && index === rows.length - 1) {
       addValue()
     }
   }
@@ -99,16 +133,16 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
       return
     }
 
-    const newValues = [...values]
-    const draggedValue = newValues[draggedIndex]
+    const newRows = [...rows]
+    const draggedRow = newRows[draggedIndex]
     
     // Remove the dragged item
-    newValues.splice(draggedIndex, 1)
+    newRows.splice(draggedIndex, 1)
     
     // Insert at the new position
-    newValues.splice(dropIndex, 0, draggedValue)
+    newRows.splice(dropIndex, 0, draggedRow)
     
-    setValues(newValues)
+    setRows(newRows)
     setDraggedIndex(null)
   }
 
@@ -130,6 +164,7 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onBlur={handleNameBlur}
             className={`h-11 w-full rounded-lg border border-gray-300 px-3 text-[16px] text-gray-800 placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none transition-colors ${
               errors.name ? 'border-red-300' : ''
             }`}
@@ -143,9 +178,9 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
         <div>
           <div className="mb-1 text-sm font-medium text-gray-700">Option values</div>
           <div className="space-y-2">
-            {values.map((value, index) => (
+            {rows.map((row, index) => (
               <div 
-                key={index} 
+                key={row.id} 
                 className={`grid grid-cols-[18px_1fr] items-center gap-2 rounded-md transition-colors ${
                   draggedIndex === index ? 'bg-blue-50 border border-blue-200' : ''
                 }`}
@@ -161,15 +196,16 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
                 <div className="relative">
                   <input
                     type="text"
-                    value={value}
-                    onChange={(e) => updateValue(index, e.target.value)}
+                    value={row.text}
+                    onChange={(e) => updateValue(row.id, e.target.value)}
                     onKeyPress={(e) => handleKeyPress(e, index)}
+                    onBlur={handleValueBlur}
                     className="h-11 w-full rounded-lg border border-gray-300 px-3 pr-10 text-[16px] text-gray-800 placeholder:text-gray-400 focus:border-gray-400 focus:ring-0 focus:outline-none transition-colors"
                     placeholder={`Value ${index + 1}`}
                   />
-                  {values.length > 1 && (
+                  {rows.length > 1 && (
                     <button
-                      onClick={() => removeValue(index)}
+                      onClick={() => removeValue(row.id)}
                       type="button"
                       className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-md p-1 hover:bg-gray-100 text-gray-500"
                     >
@@ -227,3 +263,11 @@ export default function OptionEditor({ option, onSave, onCancel, onDelete, exist
     </Container>
   )
 }
+
+// Custom comparison function to prevent re-renders
+const arePropsEqual = (prevProps, nextProps) => {
+  // Only re-render if option.id changes (switching to different option)
+  return prevProps.option?.id === nextProps.option?.id
+}
+
+export default memo(OptionEditor, arePropsEqual)
